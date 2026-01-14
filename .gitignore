@@ -1,0 +1,51 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+*.out
+
+# Go build artifacts
+*.o
+*.test
+*.prof
+
+# Go workspace
+bin/
+pkg/
+
+# Dependencies
+vendor/
+
+# Test artifacts
+coverage.out
+*.coverprofile
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+apidoc/
+dist/
+build/
+node_modules/
+
+# Log files
+*.log
+
+# Environment specific configurations
+.env
+.env.local
+.env.production
+.env.development
+
+# Compiled Go files
+*.a
+_work/
