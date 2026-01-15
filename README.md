@@ -46,22 +46,6 @@ go build -o cnf-simulator main.go
 
 To containerize this application, create a Dockerfile:
 
-```dockerfile
-FROM golang:1.21-alpine AS builder
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY main.go ./
-RUN go build -o cnf-simulator main.go
-
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-WORKDIR /root/
-COPY --from=builder /app/cnf-simulator .
-EXPOSE 8080
-CMD ["./cnf-simulator"]
-```
-
 ## Purpose
 
 This simulator is designed to demonstrate how a Cloud-Native Network Function would behave in an O-Cloud environment, providing insights into:
