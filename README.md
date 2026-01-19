@@ -55,3 +55,13 @@ This simulator is designed to demonstrate how a Cloud-Native Network Function wo
 - Configuration handling
 - Kubernetes integration
 - Environment awareness
+
+## CI/CD Integration
+
+This application is set up with a CI pipeline using GitHub Actions that:
+
+- Builds the application on every push/PR
+- Runs tests to ensure code quality
+- Builds and pushes Docker images to GitHub Container Registry
+- Performs security scanning using Trivy
+- Tags images with commit SHA for traceability
