@@ -38,6 +38,7 @@ jobs:
     - name: Test application
       run: |
         go test -v ./...
+        go tool cover -func=coverage.out
 
     - name: Build Docker image
       run: |
@@ -50,18 +51,52 @@ jobs:
         image-ref: 'cnf-simulator:${{ github.sha }}'
         format: 'sarif'
         output: 'trivy-results.sarif'
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: 'CRITICAL,HIGH'
 
     - name: Upload Trivy scan results
       uses: github/codeql-action/upload-sarif@v2
       with:
         sarif_file: 'trivy-results.sarif'
 
+    - name: Run Snyk to check for vulnerabilities
+      uses: snyk/actions/golang@master
+      continue-on-error: true
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --sarif-file-output=snyk-results.sarif
+
+    - name: Upload Snyk scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'snyk-results.sarif'
+
+    - name: SonarQube Scan
+      uses: sonarsource/sonarqube-scan-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      continue-on-error: true
+
     - name: Run container for testing
       run: |
         docker run -d --name test-container -p 8080:8080 cnf-simulator:${{ github.sha }}
         sleep 10
         curl -f http://localhost:8080/health || exit 1
+        curl -f http://localhost:8080/status || exit 1
         docker stop test-container
+
+    - name: Quality Gate Check
+      run: |
+        echo "Checking code quality metrics..."
+        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
+        if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+          echo "Code coverage is below 80%: $COVERAGE%"
+          exit 1
+        fi
+        echo "Code coverage is acceptable: ${COVERAGE}%"
 
     - name: Tag image with commit SHA
       run: |
