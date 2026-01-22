@@ -7,40 +7,41 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // CNFStatus represents the status of our Cloud-Native Network Function
 type CNFStatus struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Version     string    `json:"version"`
-	Status      string    `json:"status"`
-	StartedAt   time.Time `json:"started_at"`
-	Environment string    `json:"environment"`
-	K8sNode     string    `json:"k8s_node"`
+	ID          string       `json:"id"`
+	Name        string       `json:"name"`
+	Version     string       `json:"version"`
+	Status      string       `json:"status"`
+	StartedAt   time.Time    `json:"started_at"`
+	Environment string       `json:"environment"`
+	K8sNode     string       `json:"k8s_node"`
 	Security    SecurityInfo `json:"security"`
 }
 
 // SecurityInfo holds security-related information
 type SecurityInfo struct {
-	ScanStatus string `json:"scan_status"`
-	LastScan   string `json:"last_scan"`
-	Vulnerabilities int `json:"vulnerabilities"`
+	ScanStatus      string `json:"scan_status"`
+	LastScan        string `json:"last_scan"`
+	Vulnerabilities int    `json:"vulnerabilities"`
 	SecurityRating  string `json:"security_rating"`
 }
 
 // QualityMetrics holds quality metrics information
 type QualityMetrics struct {
-	CodeCoverage float64 `json:"code_coverage"`
+	CodeCoverage float64      `json:"code_coverage"`
 	TestResults  []TestResult `json:"test_results"`
 }
 
 // TestResult holds individual test results
 type TestResult struct {
-	Name string `json:"name"`
-	Status string `json:"status"`
+	Name     string        `json:"name"`
+	Status   string        `json:"status"`
 	Duration time.Duration `json:"duration"`
 }
 
@@ -82,11 +83,11 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("X-XSS-Protection", "1; mode=block")
-	
+
 	response := map[string]interface{}{
-		"status": "healthy",
-		"service": "cnf-simulator",
-		"timestamp": time.Now().Format(time.RFC3339),
+		"status":          "healthy",
+		"service":         "cnf-simulator",
+		"timestamp":       time.Now().Format(time.RFC3339),
 		"security_rating": cnfStatus.Security.SecurityRating,
 		"vulnerabilities": cnfStatus.Security.Vulnerabilities,
 	}
@@ -118,22 +119,50 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 // securityHandler provides security scan information
 func securityHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
+	// Check for security threshold violations
+	thresholdViolations := checkSecurityThresholds()
+
 	response := map[string]interface{}{
-		"scan_status":      cnfStatus.Security.ScanStatus,
-		"last_scan":        cnfStatus.Security.LastScan,
-		"vulnerabilities":  cnfStatus.Security.Vulnerabilities,
-		"security_rating":  cnfStatus.Security.SecurityRating,
-		"security_policy":  "strict",
-		"compliance":       "SOC2,ISO27001",
+		"scan_status":          cnfStatus.Security.ScanStatus,
+		"last_scan":            cnfStatus.Security.LastScan,
+		"vulnerabilities":      cnfStatus.Security.Vulnerabilities,
+		"security_rating":      cnfStatus.Security.SecurityRating,
+		"security_policy":      "strict",
+		"compliance":           "SOC2,ISO27001",
+		"threshold_violations": thresholdViolations,
+		"scan_enabled":         os.Getenv("SECURITY_SCAN_ENABLED") == "true",
+		"min_security_rating":  os.Getenv("MINIMUM_SECURITY_RATING"),
+		"max_vulnerabilities":  os.Getenv("MAX_VULNERABILITIES"),
 	}
 	json.NewEncoder(w).Encode(response)
+}
+
+// checkSecurityThresholds checks if security metrics are within acceptable bounds
+func checkSecurityThresholds() []string {
+	var violations []string
+
+	minRating := os.Getenv("MINIMUM_SECURITY_RATING")
+	if minRating != "" && cnfStatus.Security.SecurityRating > minRating {
+		violations = append(violations, fmt.Sprintf("Security rating %s is below minimum %s", cnfStatus.Security.SecurityRating, minRating))
+	}
+
+	maxVulns := os.Getenv("MAX_VULNERABILITIES")
+	if maxVulns != "" {
+		if maxVulnsInt, err := strconv.Atoi(maxVulns); err == nil {
+			if cnfStatus.Security.Vulnerabilities > maxVulnsInt {
+				violations = append(violations, fmt.Sprintf("Vulnerabilities count %d exceeds maximum %d", cnfStatus.Security.Vulnerabilities, maxVulnsInt))
+			}
+		}
+	}
+
+	return violations
 }
 
 // qualityHandler provides quality metrics information
 func qualityHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	metrics := QualityMetrics{
 		CodeCoverage: 85.0, // 85% code coverage as mentioned in Day 8 report
 		TestResults: []TestResult{
@@ -143,7 +172,7 @@ func qualityHandler(w http.ResponseWriter, r *http.Request) {
 			{Name: "performance_tests", Status: "passed", Duration: 60 * time.Second},
 		},
 	}
-	
+
 	json.NewEncoder(w).Encode(metrics)
 }
 
@@ -176,7 +205,7 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 // maskSensitiveData masks sensitive environment variables
 func maskSensitiveData(key, value string) string {
 	sensitiveKeys := []string{"PASSWORD", "SECRET", "TOKEN", "KEY", "AUTH"}
-	
+
 	for _, sensitiveKey := range sensitiveKeys {
 		if strings.Contains(strings.ToUpper(key), sensitiveKey) {
 			// Return a masked version of the value
@@ -187,12 +216,67 @@ func maskSensitiveData(key, value string) string {
 	return value
 }
 
+// scanHandler triggers a security scan and updates security metrics
+func scanHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Simulate a security scan process
+	scanStartTime := time.Now()
+
+	// Update security status with simulated scan results
+	cnfStatus.Security.LastScan = scanStartTime.Format(time.RFC3339)
+	cnfStatus.Security.ScanStatus = "completed"
+
+	// Generate random vulnerabilities count for simulation
+	cnfStatus.Security.Vulnerabilities = 3 // Simulated result
+
+	// Calculate security rating based on vulnerabilities
+	if cnfStatus.Security.Vulnerabilities == 0 {
+		cnfStatus.Security.SecurityRating = "A"
+	} else if cnfStatus.Security.Vulnerabilities <= 2 {
+		cnfStatus.Security.SecurityRating = "B"
+	} else if cnfStatus.Security.Vulnerabilities <= 5 {
+		cnfStatus.Security.SecurityRating = "C"
+	} else {
+		cnfStatus.Security.SecurityRating = "D"
+	}
+
+	// Check if vulnerabilities exceed the threshold
+	maxVulnsStr := os.Getenv("MAX_VULNERABILITIES")
+	maxVulns := 5 // default value
+	if maxVulnsStr != "" {
+		if maxVulnsInt, err := strconv.Atoi(maxVulnsStr); err == nil {
+			maxVulns = maxVulnsInt
+		}
+	}
+
+	scanResult := map[string]interface{}{
+		"status":                "success",
+		"scan_id":               fmt.Sprintf("scan-%d", time.Now().Unix()),
+		"scan_started":          scanStartTime.Format(time.RFC3339),
+		"scan_completed":        time.Now().Format(time.RFC3339),
+		"duration_ms":           time.Since(scanStartTime).Milliseconds(),
+		"vulnerabilities_found": cnfStatus.Security.Vulnerabilities,
+		"security_rating":       cnfStatus.Security.SecurityRating,
+		"max_allowed_vulns":     maxVulns,
+		"scan_passed":           cnfStatus.Security.Vulnerabilities <= maxVulns,
+		"message":               fmt.Sprintf("Security scan completed with %d vulnerabilities found", cnfStatus.Security.Vulnerabilities),
+	}
+
+	json.NewEncoder(w).Encode(scanResult)
+}
+
 // infoHandler provides general information about the CNF
 func infoHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	response := map[string]interface{}{
-		"service": "Cloud-Native Network Function Simulator",
+		"service":     "Cloud-Native Network Function Simulator",
 		"description": "A secure Go application simulating a CNF for O-Cloud environment with security scanning and quality gates",
 		"endpoints": []string{
 			"/health - Health check endpoint",
@@ -201,14 +285,17 @@ func infoHandler(w http.ResponseWriter, r *http.Request) {
 			"/info - Service information",
 			"/security - Security scan information",
 			"/quality - Quality metrics information",
+			"/scan - Trigger security vulnerability scan (POST only)",
 		},
 		"version": "1.0.0",
-		"author": "O-Cloud CNF Simulator",
+		"author":  "O-Cloud CNF Simulator",
 		"security_features": []string{
 			"Vulnerability scanning",
 			"Security headers",
 			"Environment variable masking",
 			"Quality gates enforcement",
+			"Threshold violation detection",
+			"Runtime security monitoring",
 		},
 	}
 	json.NewEncoder(w).Encode(response)
@@ -232,6 +319,7 @@ func main() {
 	http.HandleFunc("/info", infoHandler)
 	http.HandleFunc("/security", securityHandler)
 	http.HandleFunc("/quality", qualityHandler)
+	http.HandleFunc("/scan", scanHandler) // New security scan endpoint
 
 	// Default handler
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
