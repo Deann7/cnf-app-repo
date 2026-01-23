@@ -1,0 +1,58 @@
+name: CI with Quality Gates
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+    
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19
+        
+    - name: Install dependencies
+      run: go mod tidy
+      
+    - name: Run tests with coverage
+      run: go test -v -coverprofile=coverage.out -covermode=atomic ./...
+      
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      with:
+        args: >
+          -Dsonar.projectName=cnf-app-repo
+          -Dsonar.projectKey=cnf-app-repo
+          -Dsonar.sources=.
+          -Dsonar.tests=test
+          -Dsonar.test.inclusions=**/*_test.go
+          -Dsonar.coverage.exclusions=**/*_test.go
+          -Dsonar.go.coverage.reportPaths=coverage.out
+          
+    - name: Quality Gate Check
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
+        # Check if test coverage meets minimum requirement (80%)
+        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
+        echo "Current test coverage: $COVERAGE%"
+        
+        if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+          echo "Test coverage below threshold of 80%"
+          exit 1
+        else
+          echo "Test coverage meets quality gate requirement"
+        fi
