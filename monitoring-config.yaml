@@ -1,0 +1,159 @@
+# Monitoring Configuration for CNF Application
+# Defines monitoring and observability settings for the application
+
+prometheus:
+  enabled: true
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  
+  rules:
+    - name: cnf-application-rules
+      groups:
+        - name: cnf-app-alerts
+          rules:
+            - alert: HighErrorRate
+              expr: rate(cnfsimulator_errors_total[5m]) > 0.1
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "High error rate in CNF simulator"
+                description: "Error rate is above 0.1 errors per second for more than 2 minutes"
+            
+            - alert: HighLatency
+              expr: histogram_quantile(0.95, rate(cnfsimulator_request_duration_seconds_bucket[5m])) > 1
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "High latency in CNF simulator"
+                description: "95th percentile latency is above 1 second for more than 5 minutes"
+                
+            - alert: LowSecurityRating
+              expr: cnfsimulator_security_rating < 80
+              for: 1m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Low security rating detected"
+                description: "Security rating has dropped below 80"
+                
+            - alert: HighVulnerabilityCount
+              expr: cnfsimulator_vulnerabilities_count > 5
+              for: 1m
+              labels:
+                severity: critical
+              annotations:
+                summary: "High vulnerability count detected"
+                description: "More than 5 vulnerabilities detected in the application"
+
+grafana:
+  dashboards:
+    - name: cnf-application-dashboard
+      title: "CNF Application Dashboard"
+      panels:
+        - title: "Application Health"
+          type: "singlestat"
+          targets:
+            - expr: "cnfsimulator_status"
+        - title: "Request Rate"
+          type: "graph"
+          targets:
+            - expr: "rate(cnfsimulator_requests_total[1m])"
+        - title: "Error Rate"
+          type: "graph"
+          targets:
+            - expr: "rate(cnfsimulator_errors_total[1m])"
+        - title: "Response Time"
+          type: "graph"
+          targets:
+            - expr: "histogram_quantile(0.95, rate(cnfsimulator_request_duration_seconds_bucket[5m]))"
+        - title: "Security Rating"
+          type: "singlestat"
+          targets:
+            - expr: "cnfsimulator_security_rating"
+        - title: "Vulnerability Count"
+          type: "graph"
+          targets:
+            - expr: "cnfsimulator_vulnerabilities_count"
+  
+  notifications:
+    channels:
+      - name: alerts-channel
+        type: webhook
+        url: "${SLACK_WEBHOOK_URL}"  # Using environment variable for security
+        settings:
+          username: "CNF Monitor"
+          icon_emoji: ":warning:"
+
+logging:
+  level: info
+  format: json
+  outputs:
+    - stdout
+    - file:
+        path: /var/log/cnf-app.log
+        rotation:
+          max_size: "100MB"
+          max_backups: 5
+          max_age: 30
+          compress: true
+  
+  structured_fields:
+    - level
+    - timestamp
+    - service
+    - trace_id
+    - span_id
+    - component
+    - event
+
+tracing:
+  enabled: true
+  collector_url: "jaeger-collector.monitoring.svc.cluster.local:14268/api/traces"
+  sampling_rate: 0.1
+  service_name: "cnf-simulator"
+  
+  tags:
+    - key: "environment"
+      value: "${ENVIRONMENT}"
+    - key: "version"
+      value: "${VERSION}"
+
+health_checks:
+  liveness:
+    path: /health
+    initial_delay_seconds: 30
+    period_seconds: 10
+    timeout_seconds: 5
+    failure_threshold: 3
+  
+  readiness:
+    path: /health
+    initial_delay_seconds: 10
+    period_seconds: 5
+    timeout_seconds: 3
+    failure_threshold: 3
+
+metrics_endpoint:
+  enabled: true
+  path: /metrics
+  auth:
+    enabled: false  # In production, enable authentication
+    basic_auth:
+      username: "prometheus"
+      password: "${METRICS_PASSWORD}"
+
+exporters:
+  prometheus:
+    enabled: true
+    endpoint: ":8080"
+    path: /metrics
+  datadog:
+    enabled: false
+    api_key: "${DATADOG_API_KEY}"
+    site: "datadoghq.com"
+  stackdriver:
+    enabled: false
+    project_id: "${GOOGLE_CLOUD_PROJECT_ID}"
+    metric_prefix: "custom.googleapis.com/"
