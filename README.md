@@ -86,7 +86,6 @@ This simulator is designed to demonstrate how a Cloud-Native Network Function wo
 ## CI/CD Integration
 
 This application is set up with a comprehensive CI pipeline using GitHub Actions that:
-
 - Builds the application on every push/PR
 - Runs tests to ensure code quality
 - Performs security scanning using Trivy, Snyk, and SonarQube
@@ -94,3 +93,14 @@ This application is set up with a comprehensive CI pipeline using GitHub Actions
 - Builds and pushes Docker images to GitHub Container Registry
 - Tags images with commit SHA for traceability
 - Implements security scanning and quality gates
+
+## Additional Features
+
+This application now includes:
+- Comprehensive security scanning capabilities
+- Quality metrics tracking
+- Monitoring and alerting configurations
+- Container security policies
+- O-Cloud platform integration
+- Documentation for security implementation
+- Makefile for simplified development tasks
