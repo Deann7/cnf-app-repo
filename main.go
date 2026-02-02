@@ -94,6 +94,25 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// readyHandler returns the readiness status of the CNF
+func readyHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-XSS-Protection", "1; mode=block")
+
+	// In a real application, check database connections,
+	// external service dependencies, etc.
+	// For now, just return ready if basic initialization is done
+	response := map[string]interface{}{
+		"status":    "ready",
+		"service":   "cnf-simulator",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"ready":     true,
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
 // statusHandler returns detailed status information about the CNF
 func statusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -280,6 +299,7 @@ func infoHandler(w http.ResponseWriter, r *http.Request) {
 		"description": "A secure Go application simulating a CNF for O-Cloud environment with security scanning and quality gates",
 		"endpoints": []string{
 			"/health - Health check endpoint",
+			"/ready - Readiness check endpoint",
 			"/status - Detailed status information",
 			"/config - Configuration information",
 			"/info - Service information",
@@ -314,6 +334,7 @@ func main() {
 
 	// Define HTTP routes
 	http.HandleFunc("/health", healthHandler)
+	http.HandleFunc("/ready", readyHandler) // Readiness probe endpoint
 	http.HandleFunc("/status", statusHandler)
 	http.HandleFunc("/config", configHandler)
 	http.HandleFunc("/info", infoHandler)
