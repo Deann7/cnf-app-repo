@@ -122,16 +122,16 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	cnfStatus.Security.LastScan = time.Now().Format(time.RFC3339)
 
 	response := map[string]interface{}{
-		"id":           cnfStatus.ID,
-		"name":         cnfStatus.Name,
-		"version":      cnfStatus.Version,
-		"status":       cnfStatus.Status,
-		"started_at":   cnfStatus.StartedAt.Format(time.RFC3339),
-		"environment":  cnfStatus.Environment,
-		"k8s_node":     cnfStatus.K8sNode,
-		"current_time": time.Now().Format(time.RFC3339),
-		"uptime_seconds": int(time.Since(cnfStatus.StartedAt).Seconds()),
-		"security":     cnfStatus.Security,
+		"id":                cnfStatus.ID,
+		"name":              cnfStatus.Name,
+		"version":           cnfStatus.Version,
+		"status":            cnfStatus.Status,
+		"started_at":        cnfStatus.StartedAt.Format(time.RFC3339),
+		"environment":       cnfStatus.Environment,
+		"k8s_node":          cnfStatus.K8sNode,
+		"current_time":      time.Now().Format(time.RFC3339),
+		"uptime_seconds":    int(time.Since(cnfStatus.StartedAt).Seconds()),
+		"security":          cnfStatus.Security,
 		"validation_passed": true, // For deployment verification
 		"ready_for_traffic": true, // For deployment verification
 	}
